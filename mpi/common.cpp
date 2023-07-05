@@ -11,7 +11,7 @@ static const int thread_count = 4;
 float arr[N][N];
 float A[N][N];
 
-void init_A(float arr[][N])
+void init()
 {
     for (int i = 0; i < N; i++)
     {
@@ -35,29 +35,15 @@ void init_A(float arr[][N])
         }
     }
 }
-
-
-void reset_A(float A[][N], float arr[][N])
+void refresh(float A[][N], float arr[][N])
 {
     for (int i = 0; i < N; i++)
         for (int j = 0; j < N; j++)
             A[i][j] = arr[i][j];
 }
-
-void print_A(float A[][N])
-{
-    for (int i = 0; i < N; i++)
-    {
-        for (int j = 0; j < N; j++)
-            cout << A[i][j] << " ";
-        cout << endl;
-    }
-    cout << endl;
-}
-
 void serial()
 {
-    reset_A(A, arr);
+    refresh(A, arr);
     timeval t_start;
     timeval t_end;
     gettimeofday(&t_start, NULL);
@@ -80,9 +66,7 @@ void serial()
         }
     }
     gettimeofday(&t_end, NULL);
-    cout << "ordinary time cost: "
-        << 1000 * (t_end.tv_sec - t_start.tv_sec) +
-        0.001 * (t_end.tv_usec - t_start.tv_usec) << "ms" << endl;
+    cout << "serial time: " << 1000 * (t_end.tv_sec - t_start.tv_sec) + 0.001 * (t_end.tv_usec - t_start.tv_usec) << "ms" << endl;
 }
 
 
@@ -91,7 +75,6 @@ void LU(float A[][N], int rank, int num_proc)
 {
     int block = N / num_proc;
     int remain = N % num_proc;
-
     int begin = rank * block;
     int end = rank != num_proc - 1 ? begin + block : begin + block + remain;
    
@@ -105,14 +88,12 @@ void LU(float A[][N], int rank, int num_proc)
             for (int p = 0; p < num_proc; p++)
                 if (p != rank)
                     MPI_Send(&A[k], N, MPI_FLOAT, p, 2, MPI_COMM_WORLD);
-
         }
         else
         {
             int cur_p = k / block;
              MPI_Recv(&A[k], N, MPI_FLOAT, cur_p, 2,
                  MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
         }
 
         for (int i = begin; i < end && i < N; i++)
@@ -126,9 +107,7 @@ void LU(float A[][N], int rank, int num_proc)
         }
     }
 }
-
-
-void f_mpi()
+void common_mpi()
 {
 
     timeval t_start;
@@ -136,7 +115,6 @@ void f_mpi()
 
     int num_proc;
     int rank;
-
     MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
@@ -144,7 +122,7 @@ void f_mpi()
     int remain = N % num_proc;
     if (rank == 0)
     {
-        reset_A(A, arr);
+        refresh(A, arr);
         gettimeofday(&t_start, NULL);
         for (int i = 1; i < num_proc; i++)
         {
@@ -176,7 +154,7 @@ void f_mpi()
             }
         }
         gettimeofday(&t_end, NULL);
-        cout << "Block MPI LU time cost: "
+        cout << "block mpi LU time: "
             << 1000 * (t_end.tv_sec - t_start.tv_sec) +
             0.001 * (t_end.tv_usec - t_start.tv_usec) << "ms" << endl;
     }
@@ -208,8 +186,6 @@ void f_mpi()
         }
     }
 }
-
-
 void LU_opt(float A[][N], int rank, int num_proc)
 {
     __m128 t1, t2, t3;
@@ -267,9 +243,7 @@ void LU_opt(float A[][N], int rank, int num_proc)
         }
     }
 }
-
-
-void f_mpi_opt()
+void common_mpi_opt()
 {
 
     timeval t_start;
@@ -283,11 +257,9 @@ void f_mpi_opt()
 
     int block = N / num_proc;
     int remain = N % num_proc;
-
-    //0号进程——任务划分
     if (rank == 0)
     {
-        reset_A(A, arr);
+        refresh(A, arr);
         gettimeofday(&t_start, NULL);
         for (int i = 1; i < num_proc; i++)
         {
@@ -319,7 +291,7 @@ void f_mpi_opt()
             }
         }
         gettimeofday(&t_end, NULL);
-        cout << "Block MPI LU with SSE and OpenMP time cost: "
+        cout << "block mpi LU with SSE and OpenMP time: "
             << 1000 * (t_end.tv_sec - t_start.tv_sec) +
             0.001 * (t_end.tv_usec - t_start.tv_usec) << "ms" << endl;
     }
@@ -354,12 +326,9 @@ void f_mpi_opt()
 
 int main()
 {
-    init_A(arr);
-
+    init(arr);
     MPI_Init(NULL, NULL);
-
-    f_mpi();
-    f_mpi_opt();
+    common_mpi();
+    common_mpi_opt();
     MPI_Finalize();
-
 }
